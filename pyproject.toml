@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "thsr-helper"
+version = "0.1.0"
+description = ""
+authors = ["Nick Kuo <nickest14@gmail.com>"]
+readme = "README.md"
+packages = [{include = "thsr_helper"}]
+
+[tool.poetry.dependencies]
+python = "3.11.3"
+typer = "^0.9.0"
+rich = "^13.7.0"
+pre-commit = "^3.6.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

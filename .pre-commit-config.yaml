@@ -1,0 +1,15 @@
+repos:
+- repo: local
+  hooks:
+  - id: export-requirements
+    name: Convert pyproject.toml to requirements.txt
+    language: system
+    entry: poetry export --with dev -f requirements.txt --without-hashes --output requirements.txt
+    files: "^pyproject.toml$"
+    pass_filenames: false
+
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.2.1
+  hooks:
+    - id: ruff
+    - id: ruff-format
