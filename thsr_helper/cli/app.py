@@ -2,9 +2,11 @@ import typer
 from typing import Optional
 from thsr_helper import __app_name__, __version__
 from .config import app as config_app
+from .booking import app as booking_app
 
 app = typer.Typer()
 app.add_typer(config_app, name="config", help="Check or update config file")
+app.add_typer(booking_app, name="booking", help="Booking or check the ticket")
 
 
 def _version_callback(value: bool) -> None:
