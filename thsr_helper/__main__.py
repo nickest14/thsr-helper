@@ -1,4 +1,4 @@
-from thsr_helper.cli.app import app
+from thsr_helper.cli.app import main
 
 if __name__ == "__main__":
-    app()
+    main()

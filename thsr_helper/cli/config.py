@@ -1,38 +1,18 @@
+from collections import defaultdict
 from datetime import datetime
 from typing import Tuple
 import logging
 
 import typer
-import tomli
-from tomlkit import dump, dumps, table, document, comment, nl
+from tomlkit import dumps
 
 from thsr_helper.booking.constants import ThsrTime
-from .utils import get_config_path
-from .validate import validate_personal_id, validate_phone_number, validate_time_range
+from thsr_helper.config.utils import ConfigManager
+from thsr_helper.config.validate import validate_personal_id, validate_phone_number, validate_time_range
 
 logger = logging.getLogger(__name__)
 
 app = typer.Typer()
-
-
-def create_default_config(config_file_path: str):
-    doc = document()
-    doc.add(comment("This is a TOML document."))
-    doc.add(nl())
-
-    user = table()
-    user.add("personal_id", "")
-    user.add("phone_number", "")
-    doc.add("user", user)
-
-    conditions = table()
-    conditions.add("adult_ticket_num", 1)
-    conditions.add("date", "2024/1/1")
-    conditions.add("time_range", [])
-    conditions.add("thsr_time", "")
-    doc["conditions"] = conditions
-    with open(config_file_path, mode="wt", encoding="utf-8") as fp:
-        dump(doc, fp)
 
 
 @app.command(name="ls")
@@ -40,17 +20,8 @@ def ls():
     """
     Show the config settings
     """
-    config_file_path = get_config_path()
-    try:
-        with open(config_file_path, mode="rb") as fp:
-            config = tomli.load(fp)
-            typer.secho(f"{dumps(config)}", fg=typer.colors.CYAN)
-    except FileNotFoundError as e:
-        create_default_config(config_file_path)
-        logger.warning(
-            f"[gray37]Failed to open config file: {e}[/]", extra={"markup": True}
-        )
-
+    if config := ConfigManager().get_config():
+        typer.secho(f"{dumps(config)}", fg=typer.colors.CYAN)
 
 @app.command(name="update")
 def update(
@@ -76,34 +47,18 @@ def update(
     """
     Update the config file
     """
-    config_file_path = get_config_path()
-
-    options = {
-        "user": {
-            "personal_id": personal_id,
-            "phone_number": phone_number,
-        },
-        "conditions": {
-            "adult_ticket_num": adult_ticket_num,
-            "date": date.strftime("%Y-%m-%d") if date else None,
-            "thsr_time": thsr_time,
-            "time_range": time_range if (time_range[0] and time_range[1]) else None,
-        },
+    options = defaultdict(dict)
+    attributes = {
+        'user': {'personal_id': personal_id, 'phone_number': phone_number},
+        'conditions': {
+            'adult_ticket_num': adult_ticket_num, 'date': date, 'time_range': time_range, 'thsr_time': thsr_time}
     }
-    try:
-        with open(config_file_path, mode="r+b") as fp:
-            config = tomli.load(fp)
-            for section_name, section_data in options.items():
-                for key, value in section_data.items():
-                    if value:
-                        config[section_name][key] = value
 
-            fp.seek(0)
-            fp.write(dumps(config).encode("utf-8"))
-            fp.truncate()
-    except FileNotFoundError as e:
-        logger.warning(
-            f"[gray37]Failed to open config file: {e}[/]", extra={"markup": True}
-        )
-        typer.secho("Create the default config file", fg=typer.colors.BRIGHT_YELLOW)
-        create_default_config(config_file_path)
+    for table_name, table_attributes in attributes.items():
+        for attr_name, attr_val in table_attributes.items():
+            if isinstance(attr_val, (int, str)) and attr_val:
+                options[table_name][attr_name] = attr_val
+            elif isinstance(attr_val, tuple) and all(attr_val):
+                options[table_name][attr_name] = attr_val
+
+    ConfigManager().update_config(options)

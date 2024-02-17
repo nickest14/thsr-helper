@@ -1,13 +1,11 @@
+import sys
+import importlib
+
 import typer
 from typing import Optional
 from thsr_helper import __app_name__, __version__
-from .config import app as config_app
-from .booking import app as booking_app
 
 app = typer.Typer()
-app.add_typer(config_app, name="config", help="Check or update config file")
-app.add_typer(booking_app, name="booking", help="Booking or check the ticket")
-
 
 def _version_callback(value: bool) -> None:
     if value:
@@ -27,3 +25,20 @@ def handle_callback(
     ),
 ) -> None:
     return
+
+def register_commands(app: typer.Typer):
+    modules: dict[str, str] = {
+        'config': "Check or update config file",
+        'booking': "Booking or check the ticket",
+    }
+    for file_name, description in modules.items():
+        module = importlib.import_module(f'thsr_helper.cli.{file_name}')
+        app.add_typer(module.app, name=file_name, help=description)
+
+def main():
+    """
+    Main entry point for the CLI application.
+    """
+    register_commands(app)
+    app(prog_name="thsr_helper")
+    sys.exit()
