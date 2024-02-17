@@ -22,9 +22,8 @@ class InitPageFlow():
     def run(self) -> Tuple[Response, int]:
         book_page: bytes = self.client.booking_page().content
         img: bytes = self.client.get_captcha_img(book_page).content
-        security_code = fill_code(img)
+        security_code = fill_code(img, manual=False)
         page = html_to_soup(book_page)
-        # TODO: Add booking model
-
+        # TODO: Add BookingModel
 
 
