@@ -1,5 +1,6 @@
 from enum import Enum, unique
 
+
 class HTTPConfig:
     BASE_URL = "https://irs.thsrc.com.tw"
     BOOKING_PAGE_URL = "https://irs.thsrc.com.tw/IMINT/?locale=tw"
@@ -17,19 +18,46 @@ class HTTPConfig:
         ACCEPT_LANGUAGE = "zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3"
         ACCEPT_ENCODING = "gzip, deflate, br"
 
-class StationMapping(Enum):
-    Nangang = 1
-    Taipei = 2
-    Banqiao = 3
-    Taoyuan = 4
-    Hsinchu = 5
-    Miaoli = 6
-    Taichung = 7
-    Changhua = 8
-    Yunlin = 9
-    Chiayi = 10
-    Tainan = 11
-    Zuouing = 12
+
+@unique
+class Stations(str, Enum):
+    Nangang = "Nangang"
+    Taipei = "Taipei"
+    Banqiao = "Banqiao"
+    Taoyuan = "Taoyuan"
+    Hsinchu = "Hsinchu"
+    Miaoli = "Miaoli"
+    Taichung = "Taichung"
+    Changhua = "Changhua"
+    Yunlin = "Yunlin"
+    Chiayi = "Chiayi"
+    Tainan = "Tainan"
+    Zuouing = "Zuouing"
+
+
+STATION_MAP = {
+    Stations.Nangang: 1,
+    Stations.Taipei: 2,
+    Stations.Banqiao: 3,
+    Stations.Taoyuan: 4,
+    Stations.Hsinchu: 5,
+    Stations.Miaoli: 6,
+    Stations.Taichung: 7,
+    Stations.Changhua: 8,
+    Stations.Yunlin: 9,
+    Stations.Chiayi: 10,
+    Stations.Tainan: 11,
+    Stations.Zuouing: 12,
+}
+
+
+class TicketType(Enum):
+    ADULT = "F"
+    CHILD = "H"
+    DISABLED = "W"
+    ELDER = "E"
+    COLLEGE = "P"
+
 
 @unique
 class ThsrTime(str, Enum):

@@ -6,9 +6,13 @@ import logging
 import typer
 from tomlkit import dumps
 
-from thsr_helper.booking.constants import ThsrTime
+from thsr_helper.booking.constants import ThsrTime, Stations
 from thsr_helper.config.utils import ConfigManager
-from thsr_helper.config.validate import validate_personal_id, validate_phone_number, validate_time_range
+from thsr_helper.config.validate import (
+    validate_personal_id,
+    validate_phone_number,
+    validate_time_range,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +24,9 @@ def ls():
     """
     Show the config settings
     """
-    if config := ConfigManager().get_config():
+    if config := ConfigManager.get_config():
         typer.secho(f"{dumps(config)}", fg=typer.colors.CYAN)
+
 
 @app.command(name="update")
 def update(
@@ -30,6 +35,12 @@ def update(
     ),
     phone_number: str = typer.Option(
         None, callback=validate_phone_number, help="Phone number"
+    ),
+    start_station: Stations = typer.Option(
+        None, case_sensitive=False, help="Choose the start station"
+    ),
+    dest_station: Stations = typer.Option(
+        None, case_sensitive=False, help="Choose the destination station"
     ),
     adult_ticket_num: int = typer.Option(None, help="Adult ticket number"),
     date: datetime = typer.Option(None, formats=["%Y-%m-%d"], help="Ticket date"),
@@ -49,9 +60,15 @@ def update(
     """
     options = defaultdict(dict)
     attributes = {
-        'user': {'personal_id': personal_id, 'phone_number': phone_number},
-        'conditions': {
-            'adult_ticket_num': adult_ticket_num, 'date': date, 'time_range': time_range, 'thsr_time': thsr_time}
+        "user": {"personal_id": personal_id, "phone_number": phone_number},
+        "conditions": {
+            "start_station": start_station,
+            "dest_station": dest_station,
+            "adult_ticket_num": adult_ticket_num,
+            "date": date,
+            "time_range": time_range,
+            "thsr_time": thsr_time,
+        },
     }
 
     for table_name, table_attributes in attributes.items():
