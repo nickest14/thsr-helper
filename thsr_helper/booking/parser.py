@@ -1,3 +1,4 @@
+import abc
 from collections import namedtuple
 from typing import Mapping, Any
 
@@ -19,34 +20,40 @@ ERROR_FEEDBACK: Mapping[str, Any] = {
 }
 
 
-def html_to_soup(content: bytes) -> BeautifulSoup:
-    return BeautifulSoup(content, features="html.parser")
+class BaseParser(metaclass=abc.ABCMeta):
+    @classmethod
+    def html_to_soup(cls, content: bytes) -> BeautifulSoup:
+        return BeautifulSoup(content, features="html.parser")
 
 
-def parse_captcha_img_url(page: BeautifulSoup) -> str:
-    return HTTPConfig.BASE_URL + page.find(**BOOKING_PAGE["security_code_img"]).get(
-        "src"
-    )
+class BookingFlowParser(BaseParser):
+    @classmethod
+    def parse_response_error(cls, page: BeautifulSoup):
+        items = page.find_all(**ERROR_FEEDBACK)
+        return [Error(item.text) for item in items]
 
 
-def parse_seat_prefer_value(page: BeautifulSoup) -> str:
-    options = page.find(**BOOKING_PAGE["seat_prefer_radio"])
-    preferred_seat = options.find_next(selected="selected")
-    return preferred_seat.attrs["value"]
+class InitPageParser(BaseParser):
+    @classmethod
+    def parse_captcha_img_url(cls, page: BeautifulSoup) -> str:
+        return HTTPConfig.BASE_URL + page.find(**BOOKING_PAGE["security_code_img"]).get(
+            "src"
+        )
 
+    @classmethod
+    def parse_seat_prefer_value(cls, page: BeautifulSoup) -> str:
+        options = page.find(**BOOKING_PAGE["seat_prefer_radio"])
+        preferred_seat = options.find_next(selected="selected")
+        return preferred_seat.attrs["value"]
 
-def parse_types_of_trip_value(page: BeautifulSoup) -> int:
-    options = page.find(**BOOKING_PAGE["types_of_trip"])
-    tag = options.find_next(selected="selected")
-    return int(tag.attrs["value"])
+    @classmethod
+    def parse_types_of_trip_value(cls, page: BeautifulSoup) -> int:
+        options = page.find(**BOOKING_PAGE["types_of_trip"])
+        tag = options.find_next(selected="selected")
+        return int(tag.attrs["value"])
 
-
-def parse_search_by(page: BeautifulSoup) -> str:
-    candidates = page.find_all("input", {"name": "bookingMethod"})
-    tag = next((cand for cand in candidates if "checked" in cand.attrs))
-    return tag.attrs["value"]
-
-
-def parse_response_error(page: BeautifulSoup):
-    items = page.find_all(**ERROR_FEEDBACK)
-    return [Error(item.text) for item in items]
+    @classmethod
+    def parse_search_by(cls, page: BeautifulSoup) -> str:
+        candidates = page.find_all("input", {"name": "bookingMethod"})
+        tag = next((cand for cand in candidates if "checked" in cand.attrs))
+        return tag.attrs["value"]

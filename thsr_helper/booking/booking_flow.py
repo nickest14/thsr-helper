@@ -5,14 +5,7 @@ import logging
 
 from requests.models import Response
 from .utils import fill_code
-from .parser import (
-    html_to_soup,
-    parse_captcha_img_url,
-    parse_seat_prefer_value,
-    parse_types_of_trip_value,
-    parse_search_by,
-    parse_response_error,
-)
+from .parser import BookingFlowParser, InitPageParser
 from .schema import BookingModel
 from .constants import STATION_MAP, TicketType
 from thsr_helper.booking.requests import HTTPRequest
@@ -27,16 +20,27 @@ class BookingFlow:
     def __init__(self, config: dict[str, any]) -> None:
         self.client = HTTPRequest()
         self.config = config
+        self.parser = BookingFlowParser
         self.errors: list[Error] = []
 
     def run(self) -> None:
-        booking_response, booking_model = InitPageFlow(self.client, self.config).run()
+        # First page to get booking options.
+        booking_response, booking_model = InitPageFlow(
+            self.client, self.config.get("conditions")
+        ).run()
         if self.check_error(booking_response):
             return
 
+        # Second page. Train confirmation.
+        train_response = ConfirmTrainFlow(
+            self.client, self.config.get("conditions"), booking_model
+        ).run()
+        if self.check_error(train_response):
+            return
+
     def check_error(self, resp: Response) -> None:
-        page = html_to_soup(resp)
-        if errors := parse_response_error(page):
+        page = self.parser.html_to_soup(resp)
+        if errors := self.parser.parse_response_error(page):
             self.errors.extend(errors)
             self.show_error()
             return True
@@ -47,28 +51,28 @@ class BookingFlow:
 
 
 class InitPageFlow:
-    def __init__(self, client: HTTPRequest, config: dict[str, any]) -> None:
+    def __init__(self, client: HTTPRequest, conditions: dict[str, any]) -> None:
         self.client = client
-        self.config = config
+        self.conditions = conditions
+        self.parser = InitPageParser
 
     def run(self) -> Tuple[Response, int]:
         init_response: bytes = self.client.booking_page().content
-        page = html_to_soup(init_response)
-        image_url = parse_captcha_img_url(page)
+        page = self.parser.html_to_soup(init_response)
+        image_url = self.parser.parse_captcha_img_url(page)
         img: bytes = self.client.get_captcha_img(image_url).content
 
-        conditions = self.config.get("conditions", {})
         booking_model = BookingModel(
-            start_station=STATION_MAP.get(conditions["start_station"]),
-            dest_station=STATION_MAP.get(conditions["dest_station"]),
-            outbound_time=conditions["thsr_time"],
-            outbound_date=conditions["date"],
+            start_station=STATION_MAP.get(self.conditions["start_station"]),
+            dest_station=STATION_MAP.get(self.conditions["dest_station"]),
+            outbound_time=self.conditions["thsr_time"],
+            outbound_date=self.conditions["date"],
             adult_ticket_num=self.convert_ticket_num(
-                TicketType.ADULT, conditions["adult_ticket_num"]
+                TicketType.ADULT, self.conditions["adult_ticket_num"]
             ),
-            seat_prefer=parse_seat_prefer_value(page),
-            types_of_trip=parse_types_of_trip_value(page),
-            search_by=parse_search_by(page),
+            seat_prefer=self.parser.parse_seat_prefer_value(page),
+            types_of_trip=self.parser.parse_types_of_trip_value(page),
+            search_by=self.parser.parse_search_by(page),
             security_code=fill_code(img, manual=True),
         )
         dict_params = json.loads(booking_model.json(by_alias=True))
@@ -77,3 +81,15 @@ class InitPageFlow:
 
     def convert_ticket_num(self, ticket_type: TicketType, ticket_num: int) -> str:
         return f"{ticket_num}{ticket_type.value}"
+
+
+class ConfirmTrainFlow:
+    def __init__(
+        self, client: HTTPRequest, conditions: dict[str, any], booking_response: bytes
+    ) -> None:
+        self.client = client
+        self.conditions = conditions
+        self.booking_response = booking_response
+
+    def run():
+        pass
