@@ -6,6 +6,7 @@ from requests.models import Response
 
 from .constants import HTTPConfig
 
+
 class HTTPRequest:
     def __init__(self, max_retries: int = 3) -> None:
         self.session = Session()
@@ -19,11 +20,25 @@ class HTTPRequest:
         }
 
     def booking_page(self) -> Response:
-        return self.session.get(HTTPConfig.BOOKING_PAGE_URL, headers=self.common_header, allow_redirects=True)
+        return self.session.get(
+            HTTPConfig.BOOKING_PAGE_URL,
+            headers=self.common_header,
+            allow_redirects=True,
+        )
 
     def get_captcha_img(self, img_url: str) -> Response:
         return self.session.get(img_url, headers=self.common_header)
 
     def submit_booking_form(self, params: Mapping[str, Any]) -> Response:
         url = HTTPConfig.SUBMIT_FORM_URL.format(self.session.cookies["JSESSIONID"])
-        return self.session.post(url, headers=self.common_header, params=params, allow_redirects=True)
+        return self.session.post(
+            url, headers=self.common_header, params=params, allow_redirects=True
+        )
+
+    def submit_train(self, params: Mapping[str, Any]) -> Response:
+        return self.session.post(
+            HTTPConfig.CONFIRM_TRAIN_URL,
+            headers=self.common_header,
+            params=params,
+            allow_redirects=True,
+        )

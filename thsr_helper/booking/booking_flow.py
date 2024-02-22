@@ -5,8 +5,8 @@ import logging
 
 from requests.models import Response
 from .utils import fill_code
-from .parser import BookingFlowParser, InitPageParser
-from .schema import BookingModel
+from .parser import BookingFlowParser, ConfirmTrainParser, InitPageParser
+from .schema import BookingModel, ConfirmTrainModel, Train
 from .constants import STATION_MAP, TicketType
 from thsr_helper.booking.requests import HTTPRequest
 
@@ -16,7 +16,12 @@ logger = logging.getLogger(__name__)
 Error = namedtuple("Error", ["msg"])
 
 
-class BookingFlow:
+class BaseFlow:
+    def __init__(self, client: HTTPRequest, config: dict[str, any]) -> None:
+        self.client = client
+
+
+class BookingFlow(BaseFlow):
     def __init__(self, config: dict[str, any]) -> None:
         self.client = HTTPRequest()
         self.config = config
@@ -32,11 +37,14 @@ class BookingFlow:
             return
 
         # Second page. Train confirmation.
-        train_response = ConfirmTrainFlow(
-            self.client, self.config.get("conditions"), booking_model
+        train_response, confirm_model = ConfirmTrainFlow(
+            self.client, self.config.get("conditions"), booking_response
         ).run()
-        if self.check_error(train_response):
+        if not confirm_model or self.check_error(train_response):
             return
+
+        # Final page. Ticket confirmation.
+        # TODO: Actually order tickets.
 
     def check_error(self, resp: Response) -> None:
         page = self.parser.html_to_soup(resp)
@@ -56,7 +64,7 @@ class InitPageFlow:
         self.conditions = conditions
         self.parser = InitPageParser
 
-    def run(self) -> Tuple[Response, int]:
+    def run(self) -> Tuple[bytes, BookingModel]:
         init_response: bytes = self.client.booking_page().content
         page = self.parser.html_to_soup(init_response)
         image_url = self.parser.parse_captcha_img_url(page)
@@ -90,6 +98,30 @@ class ConfirmTrainFlow:
         self.client = client
         self.conditions = conditions
         self.booking_response = booking_response
+        self.parser = ConfirmTrainParser
 
-    def run():
-        pass
+    def run(self) -> Tuple[bytes, ConfirmTrainModel | None]:
+        page = self.parser.html_to_soup(self.booking_response)
+        self.trains = self.parser.parse_trains(page)
+        selected_train = self.choose_train()
+        if not selected_train:
+            logger.warning(
+                "[dodger_blue1]Error: No available train to select.",
+                extra={"markup": True},
+            )
+            return None, None
+        confirm_model = ConfirmTrainModel(selected_train=selected_train)
+        dict_params = json.loads(confirm_model.json(by_alias=True))
+        confirm_response = self.client.submit_train(dict_params).content
+        return confirm_response, confirm_model
+
+    def choose_train(self) -> Train:
+        for train in self.trains:
+            # TODO: Support discount and student ticket
+            if train.discount_str != "":
+                continue
+            start_hour, end_hour = self.conditions.get("time_range")
+            hour = int(train.depart.split(":")[0])
+            if start_hour <= hour <= end_hour:
+                return train.form_value
+        return None

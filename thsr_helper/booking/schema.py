@@ -67,3 +67,18 @@ class BookingModel(BaseModel):
         if not re.match(r"\d+F", value):
             raise BadParameter(f"Invalid adult ticket num format: {value}")
         return value
+
+
+class Train(BaseModel):
+    id: int
+    depart: str
+    arrive: str
+    travel_time: str
+    discount_str: str
+    form_value: str
+
+
+class ConfirmTrainModel(BaseModel):
+    selected_train: str = Field(
+        ..., serialization_alias="TrainQueryDataViewPanel:TrainGroup"
+    )
