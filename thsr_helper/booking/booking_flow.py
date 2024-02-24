@@ -4,9 +4,19 @@ import json
 import logging
 
 from requests.models import Response
+from rich.console import Console
+from rich.table import Table
+import typer
+
 from .utils import fill_code
-from .parser import BookingFlowParser, ConfirmTrainParser, InitPageParser
-from .schema import BookingModel, ConfirmTrainModel, Train
+from .parser import (
+    BookingFlowParser,
+    ConfirmTrainParser,
+    InitPageParser,
+    ConfirmTicketParser,
+    Ticket,
+)
+from .schema import BookingModel, ConfirmTrainModel, Train, ConfirmTicketModel
 from .constants import STATION_MAP, TicketType
 from thsr_helper.booking.requests import HTTPRequest
 
@@ -17,12 +27,14 @@ Error = namedtuple("Error", ["msg"])
 
 
 class BaseFlow:
-    def __init__(self, client: HTTPRequest, config: dict[str, any]) -> None:
+    def __init__(self, client: HTTPRequest, conditions: dict[str, any]) -> None:
         self.client = client
+        self.conditions = conditions
+        self.parser = None
 
 
-class BookingFlow(BaseFlow):
-    def __init__(self, config: dict[str, any]) -> None:
+class BookingFlow:
+    def __init__(self, config: dict[str, any] = None) -> None:
         self.client = HTTPRequest()
         self.config = config
         self.parser = BookingFlowParser
@@ -44,7 +56,48 @@ class BookingFlow(BaseFlow):
             return
 
         # Final page. Ticket confirmation.
-        # TODO: Actually order tickets.
+        ticket_response, ticket_model = ConfirmTicketFlow(
+            self.client,
+            self.config.get("conditions"),
+            self.config.get("user"),
+            train_response,
+        ).run()
+        if self.check_error(ticket_response):
+            return
+        page = self.parser.html_to_soup(ticket_response)
+        ticket = self.parser.parse_booking_result(page)
+        self.show_ticket(ticket)
+
+    def show_ticket(self, ticket: Ticket) -> None:
+        console = Console()
+        typer.secho(
+            "-------------- 訂位結果 --------------", fg=typer.colors.BRIGHT_YELLOW
+        )
+        typer.secho(f"繳費期限: {ticket.payment_deadline}", fg=typer.colors.BRIGHT_CYAN)
+        typer.secho(f"票數: {ticket.ticket_num_info}", fg=typer.colors.BRIGHT_CYAN)
+        typer.secho(f"總價: {ticket.price}", fg=typer.colors.BRIGHT_CYAN)
+        table = Table(show_header=True, header_style="bold dark_magenta")
+        cols = [
+            {"field": "日期", "style": "light_yellow3"},
+            {"field": "訂位代號", "style": "dark_red"},
+            {"field": "起程站", "style": ""},
+            {"field": "到達站", "style": ""},
+            {"field": "出發時間", "style": ""},
+            {"field": "到達時間", "style": ""},
+            {"field": "車次", "style": ""},
+        ]
+        for col in cols:
+            table.add_column(col.get("field"), style=col.get("style"), justify="right")
+        table.add_row(
+            ticket.date,
+            ticket.id,
+            ticket.start_station,
+            ticket.dest_station,
+            ticket.depart_time,
+            ticket.arrival_time,
+            ticket.train_id,
+        )
+        console.print(table)
 
     def check_error(self, resp: Response) -> None:
         page = self.parser.html_to_soup(resp)
@@ -58,10 +111,9 @@ class BookingFlow(BaseFlow):
             logger.warning(f"[gray37]Error: {error.msg}[/]", extra={"markup": True})
 
 
-class InitPageFlow:
+class InitPageFlow(BaseFlow):
     def __init__(self, client: HTTPRequest, conditions: dict[str, any]) -> None:
-        self.client = client
-        self.conditions = conditions
+        super().__init__(client, conditions)
         self.parser = InitPageParser
 
     def run(self) -> Tuple[bytes, BookingModel]:
@@ -91,12 +143,11 @@ class InitPageFlow:
         return f"{ticket_num}{ticket_type.value}"
 
 
-class ConfirmTrainFlow:
+class ConfirmTrainFlow(BaseFlow):
     def __init__(
         self, client: HTTPRequest, conditions: dict[str, any], booking_response: bytes
     ) -> None:
-        self.client = client
-        self.conditions = conditions
+        super().__init__(client, conditions)
         self.booking_response = booking_response
         self.parser = ConfirmTrainParser
 
@@ -125,3 +176,33 @@ class ConfirmTrainFlow:
             if start_hour <= hour <= end_hour:
                 return train.form_value
         return None
+
+
+class ConfirmTicketFlow(BaseFlow):
+    def __init__(
+        self,
+        client: HTTPRequest,
+        conditions: dict[str, any],
+        user_info: dict[str, any],
+        train_response: bytes,
+    ) -> None:
+        super().__init__(client, conditions)
+        self.user_info = user_info
+        self.train_response = train_response
+        self.parser = ConfirmTicketParser
+
+    def run(self) -> Tuple[bytes, ConfirmTicketModel | None]:
+        page = self.parser.html_to_soup(self.train_response)
+        ticket_model = ConfirmTicketModel(
+            personal_id=self.user_info.get("personal_id"),
+            phone_num=self.user_info.get("phone_number"),
+            member_radio=self.parser.parse_member_radio(page),
+        )
+        if email := self.user_info.get("email"):
+            ticket_model.email = email
+
+        # TODO: Support early bird and processenger count
+
+        dict_params = json.loads(ticket_model.json(by_alias=True))
+        ticket_response = self.client.submit_ticket(dict_params).content
+        return ticket_response, ticket_model

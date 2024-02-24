@@ -12,6 +12,7 @@ from thsr_helper.config.validate import (
     validate_personal_id,
     validate_phone_number,
     validate_time_range,
+    validate_email,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ def update(
     phone_number: str = typer.Option(
         None, callback=validate_phone_number, help="Phone number"
     ),
+    email: str = typer.Option(None, callback=validate_email, help="Email"),
     start_station: Stations = typer.Option(
         None, case_sensitive=False, help="Choose the start station"
     ),
@@ -60,7 +62,11 @@ def update(
     """
     options = defaultdict(dict)
     attributes = {
-        "user": {"personal_id": personal_id, "phone_number": phone_number},
+        "user": {
+            "personal_id": personal_id,
+            "phone_number": phone_number,
+            "email": email,
+        },
         "conditions": {
             "start_station": start_station,
             "dest_station": dest_station,

@@ -21,6 +21,13 @@ def validate_phone_number(value: str):
     return value
 
 
+def validate_email(value: str):
+    pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    if value and not re.match(pattern, value):
+        raise BadParameter("Wrong email format.")
+    return value
+
+
 def validate_time_range(value: Tuple[int, int]):
     start_hour, end_hour = value
     if start_hour and end_hour:

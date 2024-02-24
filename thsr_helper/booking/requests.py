@@ -42,3 +42,11 @@ class HTTPRequest:
             params=params,
             allow_redirects=True,
         )
+
+    def submit_ticket(self, params: Mapping[str, Any]) -> Response:
+        return self.session.post(
+            HTTPConfig.CONFIRM_TICKET_URL,
+            headers=self.common_header,
+            params=params,
+            allow_redirects=True,
+        )

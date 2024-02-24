@@ -20,12 +20,7 @@ class BookingModel(BaseModel):
     class_type: int = Field(0, serialization_alias="trainCon:trainRadioGroup")
     security_code: str = Field(..., serialization_alias="homeCaptcha:securityCode")
 
-    # TODO: Check fields.
-    # inbound_date: str = Field(None, serialization_alias="backTimeInputField")
-    # inbound_time: str = Field(None, serialization_alias="backTimeTable")
-    # form_mark: str = Field("", serialization_alias="BookingS1Form:hf:0")
-    # to_train_id: int = Field(None, serialization_alias="toTrainIDInputField")
-    # back_train_id: int = Field(None, serialization_alias="backTrainIDInputField")
+    # TODO: Support other kind of ticket.
     # child_ticket_num: str = Field("0H", serialization_alias="ticketPanel:rows:1:ticketAmount")
     # disabled_ticket_num: str = Field("0W", serialization_alias="ticketPanel:rows:2:ticketAmount")
     # elder_ticket_num: str = Field("0E", serialization_alias="ticketPanel:rows:3:ticketAmount")
@@ -82,3 +77,26 @@ class ConfirmTrainModel(BaseModel):
     selected_train: str = Field(
         ..., serialization_alias="TrainQueryDataViewPanel:TrainGroup"
     )
+
+
+class ConfirmTicketModel(BaseModel):
+    personal_id: str = Field(..., serialization_alias="dummyId")
+    phone_num: str = Field(..., serialization_alias="dummyPhone")
+    email: str = Field("", serialization_alias="email")
+    member_radio: str = Field(
+        ...,
+        serialization_alias="TicketMemberSystemInputPanel:TakerMemberSystemDataView:memberSystemRadioGroup",
+        description="非高鐵會員, 企業會員 / 高鐵會員 / 企業會員統編",
+    )
+    form_mark: str = Field("", serialization_alias="BookingS3FormSP:hf:0")
+    id_input_radio: int = Field(
+        0, serialization_alias="idInputRadio", description="0: 身份證字號 / 1: 護照號碼"
+    )
+    diff_over: int = Field(1, serialization_alias="diffOver")
+    agree: str = Field("on", serialization_alias="agree")
+    go_back_m: str = Field("", serialization_alias="isGoBackM")
+    back_home: str = Field("", serialization_alias="backHome")
+    tgo_error: int = Field(1, serialization_alias="TgoError")
+    # TODO: Support early bird ticket
+    early_bird: int = Field(0, serialization_alias="isEarlyBirdRegister")
+    # passenger_count: int = Field(1, serialization_alias='passengerCount')
