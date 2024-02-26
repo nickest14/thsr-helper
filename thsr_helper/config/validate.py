@@ -28,6 +28,14 @@ def validate_email(value: str):
     return value
 
 
+def validate_ids(value: str):
+    pattern = r"^[A-Za-z]\d{9}$"
+    for id in value.split(","):
+        if not re.match(pattern, id):
+            raise BadParameter("Wrong id format.")
+    return value
+
+
 def validate_time_range(value: Tuple[int, int]):
     start_hour, end_hour = value
     if start_hour and end_hour:

@@ -34,6 +34,17 @@ class ConfigManager:
 
         conditions = table()
         conditions.add("adult_ticket_num", condition_params.get("adult_ticket_num", 1))
+        conditions.add("child_ticket_num", condition_params.get("child_ticket_num", 0))
+        conditions.add(
+            "disabled_ticket_num", condition_params.get("disabled_ticket_num", 0)
+        )
+        conditions.add("elder_ticket_num", condition_params.get("elder_ticket_num", 0))
+        conditions.add(
+            "college_ticket_num", condition_params.get("college_ticket_num", 0)
+        )
+        conditions.add(
+            "train_requirement", condition_params.get("train_requirement", "0")
+        )
         conditions.add("date", condition_params.get("date", "2024-1-1"))
         conditions.add("thsr_time", condition_params.get("thsr_time", ""))
         conditions.add("time_range", condition_params.get("time_range", []))

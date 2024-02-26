@@ -51,12 +51,25 @@ STATION_MAP = {
 }
 
 
-class TicketType(Enum):
-    ADULT = "F"
-    CHILD = "H"
-    DISABLED = "W"
-    ELDER = "E"
-    COLLEGE = "P"
+@unique
+class PassengerType(Enum):
+    ADULT = "adult"
+    CHILD = "child"
+    DISABLED = "disabled"
+    ELDER = "elder"
+    COLLEGE = "college"
+
+
+PASSENGER_TYPE_MAP = {
+    PassengerType.ADULT: "F",
+    PassengerType.CHILD: "H",
+    PassengerType.DISABLED: "W",
+    PassengerType.ELDER: "E",
+    PassengerType.COLLEGE: "P",
+}
+
+CHECK_ID_TYPE = [PassengerType.DISABLED, PassengerType.ELDER]
+EARLY_BIRD_KEY = "早鳥"
 
 
 @unique
@@ -99,3 +112,10 @@ class ThsrTime(str, Enum):
     P1030 = "1030P"
     P1100 = "1100P"
     P1130 = "1130P"
+
+
+@unique
+class TrainRequirement(str, Enum):
+    ALL = "0"
+    EARLY_BIRD = "1"
+    NORMAL = "2"

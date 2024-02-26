@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Tuple
+from typing import Tuple, Dict, List
 import json
 import logging
 
@@ -17,13 +17,19 @@ from .parser import (
     Ticket,
 )
 from .schema import BookingModel, ConfirmTrainModel, Train, ConfirmTicketModel
-from .constants import STATION_MAP, TicketType
+from .constants import (
+    STATION_MAP,
+    PassengerType,
+    PASSENGER_TYPE_MAP,
+    EARLY_BIRD_KEY,
+    CHECK_ID_TYPE,
+)
 from thsr_helper.booking.requests import HTTPRequest
 
 
 logger = logging.getLogger(__name__)
 
-Error = namedtuple("Error", ["msg"])
+Error = namedtuple("Error", "msg")
 
 
 class BaseFlow:
@@ -42,38 +48,42 @@ class BookingFlow:
 
     def run(self) -> None:
         # First page to get booking options.
-        booking_response, booking_model = InitPageFlow(
+        booking_response, passenger_info = InitPageFlow(
             self.client, self.config.get("conditions")
         ).run()
         if self.check_error(booking_response):
             return
 
         # Second page. Train confirmation.
-        train_response, confirm_model = ConfirmTrainFlow(
+        train_response, selected_train = ConfirmTrainFlow(
             self.client, self.config.get("conditions"), booking_response
         ).run()
-        if not confirm_model or self.check_error(train_response):
+        if not selected_train or self.check_error(train_response):
             return
 
         # Final page. Ticket confirmation.
-        ticket_response, ticket_model = ConfirmTicketFlow(
+        ticket_response, error = ConfirmTicketFlow(
             self.client,
             self.config.get("conditions"),
             self.config.get("user"),
             train_response,
+            passenger_info,
+            selected_train,
         ).run()
-        if self.check_error(ticket_response):
+        if error or self.check_error(ticket_response):
             return
         page = self.parser.html_to_soup(ticket_response)
         ticket = self.parser.parse_booking_result(page)
         self.show_ticket(ticket)
 
     def show_ticket(self, ticket: Ticket) -> None:
+        personal_id = self.config.get("user").get("personal_id")
         console = Console()
         typer.secho(
             "-------------- 訂位結果 --------------", fg=typer.colors.BRIGHT_YELLOW
         )
         typer.secho(f"繳費期限: {ticket.payment_deadline}", fg=typer.colors.BRIGHT_CYAN)
+        typer.secho(f"訂票身分證: {personal_id}", fg=typer.colors.BRIGHT_CYAN)
         typer.secho(f"票數: {ticket.ticket_num_info}", fg=typer.colors.BRIGHT_CYAN)
         typer.secho(f"總價: {ticket.price}", fg=typer.colors.BRIGHT_CYAN)
         table = Table(show_header=True, header_style="bold dark_magenta")
@@ -116,11 +126,19 @@ class InitPageFlow(BaseFlow):
         super().__init__(client, conditions)
         self.parser = InitPageParser
 
-    def run(self) -> Tuple[bytes, BookingModel]:
+    def run(self) -> Tuple[bytes, Dict[PassengerType, int]]:
         init_response: bytes = self.client.booking_page().content
         page = self.parser.html_to_soup(init_response)
         image_url = self.parser.parse_captcha_img_url(page)
         img: bytes = self.client.get_captcha_img(image_url).content
+
+        passenger_info = {
+            PassengerType.ADULT: self.conditions.get("adult_ticket_num", 0),
+            PassengerType.CHILD: self.conditions.get("child_ticket_num", 0),
+            PassengerType.DISABLED: self.conditions.get("disabled_ticket_num", 0),
+            PassengerType.ELDER: self.conditions.get("elder_ticket_num", 0),
+            PassengerType.COLLEGE: self.conditions.get("college_ticket_num", 0),
+        }
 
         booking_model = BookingModel(
             start_station=STATION_MAP.get(self.conditions["start_station"]),
@@ -128,19 +146,32 @@ class InitPageFlow(BaseFlow):
             outbound_time=self.conditions["thsr_time"],
             outbound_date=self.conditions["date"],
             adult_ticket_num=self.convert_ticket_num(
-                TicketType.ADULT, self.conditions["adult_ticket_num"]
+                passenger_info.get(PassengerType.ADULT), PassengerType.ADULT
+            ),
+            child_ticket_num=self.convert_ticket_num(
+                passenger_info.get(PassengerType.CHILD), PassengerType.CHILD
+            ),
+            disabled_ticket_num=self.convert_ticket_num(
+                passenger_info.get(PassengerType.DISABLED), PassengerType.DISABLED
+            ),
+            elder_ticket_num=self.convert_ticket_num(
+                passenger_info.get(PassengerType.ELDER), PassengerType.ELDER
+            ),
+            college_ticket_num=self.convert_ticket_num(
+                passenger_info.get(PassengerType.COLLEGE), PassengerType.COLLEGE
             ),
             seat_prefer=self.parser.parse_seat_prefer_value(page),
             types_of_trip=self.parser.parse_types_of_trip_value(page),
             search_by=self.parser.parse_search_by(page),
+            train_requirement=int(self.conditions.get("train_requirement", 0)),
             security_code=fill_code(img, manual=True),
         )
         dict_params = json.loads(booking_model.json(by_alias=True))
         booking_response = self.client.submit_booking_form(dict_params).content
-        return booking_response, booking_model
+        return booking_response, passenger_info
 
-    def convert_ticket_num(self, ticket_type: TicketType, ticket_num: int) -> str:
-        return f"{ticket_num}{ticket_type.value}"
+    def convert_ticket_num(self, ticket_num: int, passenger_type: PassengerType) -> str:
+        return f"{ticket_num}{PASSENGER_TYPE_MAP.get(passenger_type)}"
 
 
 class ConfirmTrainFlow(BaseFlow):
@@ -154,27 +185,24 @@ class ConfirmTrainFlow(BaseFlow):
     def run(self) -> Tuple[bytes, ConfirmTrainModel | None]:
         page = self.parser.html_to_soup(self.booking_response)
         self.trains = self.parser.parse_trains(page)
-        selected_train = self.choose_train()
+        selected_train: Train = self.choose_train()
         if not selected_train:
             logger.warning(
                 "[dodger_blue1]Error: No available train to select.",
                 extra={"markup": True},
             )
             return None, None
-        confirm_model = ConfirmTrainModel(selected_train=selected_train)
+        confirm_model = ConfirmTrainModel(selected_train=selected_train.form_value)
         dict_params = json.loads(confirm_model.json(by_alias=True))
         confirm_response = self.client.submit_train(dict_params).content
-        return confirm_response, confirm_model
+        return confirm_response, selected_train
 
     def choose_train(self) -> Train:
         for train in self.trains:
-            # TODO: Support discount and student ticket
-            if train.discount_str != "":
-                continue
             start_hour, end_hour = self.conditions.get("time_range")
             hour = int(train.depart.split(":")[0])
             if start_hour <= hour <= end_hour:
-                return train.form_value
+                return train
         return None
 
 
@@ -185,13 +213,17 @@ class ConfirmTicketFlow(BaseFlow):
         conditions: dict[str, any],
         user_info: dict[str, any],
         train_response: bytes,
+        passenger_info: Dict[PassengerType, int],
+        train: Train,
     ) -> None:
         super().__init__(client, conditions)
         self.user_info = user_info
         self.train_response = train_response
+        self.passenger_info = passenger_info
+        self.train = train
         self.parser = ConfirmTicketParser
 
-    def run(self) -> Tuple[bytes, ConfirmTicketModel | None]:
+    def run(self) -> Tuple[bytes, Error | None]:
         page = self.parser.html_to_soup(self.train_response)
         ticket_model = ConfirmTicketModel(
             personal_id=self.user_info.get("personal_id"),
@@ -201,8 +233,59 @@ class ConfirmTicketFlow(BaseFlow):
         if email := self.user_info.get("email"):
             ticket_model.email = email
 
-        # TODO: Support early bird and processenger count
+        self.params = json.loads(ticket_model.json(by_alias=True))
+        if error := self.updated_passenger_id():
+            return None, error
+        ticket_response = self.client.submit_ticket(self.params).content
+        return ticket_response, None
 
-        dict_params = json.loads(ticket_model.json(by_alias=True))
-        ticket_response = self.client.submit_ticket(dict_params).content
-        return ticket_response, ticket_model
+    def updated_passenger_id(self) -> None:
+        early_bird = EARLY_BIRD_KEY in self.train.discount_str
+        id_check_required = any(
+            self.passenger_info.get(pass_type, 0) > 0 for pass_type in CHECK_ID_TYPE
+        )
+
+        if early_bird or id_check_required:
+            passenger_num = 0
+            self.params[
+                f"TicketPassengerInfoInputPanel:passengerDataView:{passenger_num}:passengerDataView2:passengerDataInputChoice"
+            ] = "0"
+            for pass_type, passenger_count in self.passenger_info.items():
+                if passenger_count == 0:
+                    continue
+                pass_ids: List = self.conditions.get(
+                    f"{pass_type.value}_ids", ""
+                ).split(",")
+                use_pass_ids, error = self.validate_passenger_id(
+                    early_bird, pass_ids, pass_type, passenger_count
+                )
+                if error:
+                    return error
+
+                for idx in range(passenger_count):
+                    pass_id = pass_ids[idx] if use_pass_ids else ""
+                    self.params[
+                        f"TicketPassengerInfoInputPanel:passengerDataView:{passenger_num}:passengerDataView2:passengerDataIdNumber"
+                    ] = pass_id
+
+                passenger_num += 1
+
+    def validate_passenger_id(
+        self,
+        early_bird: bool,
+        pass_ids: List[str],
+        pass_type: PassengerType,
+        passenger_count: int,
+    ) -> Tuple[bool, Error]:
+        if (
+            early_bird and pass_type == PassengerType.ADULT
+        ) or pass_type in CHECK_ID_TYPE:
+            if len(pass_ids) != passenger_count or not all(pass_ids):
+                logger.warning(
+                    f"[dark_slate_gray2]Error: {pass_type.value} ids not matched, please updated key: {pass_type.value}_ids in config[/]",
+                    extra={"markup": True},
+                )
+                return None, Error(f"Error: {pass_type.value} ids not matched")
+            return True, None
+        else:
+            return False, None

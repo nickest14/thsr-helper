@@ -14,17 +14,26 @@ class BookingModel(BaseModel):
     adult_ticket_num: str = Field(
         "1F", serialization_alias="ticketPanel:rows:0:ticketAmount"
     )
+    child_ticket_num: str = Field(
+        "0H", serialization_alias="ticketPanel:rows:1:ticketAmount"
+    )
+    disabled_ticket_num: str = Field(
+        "0W", serialization_alias="ticketPanel:rows:2:ticketAmount"
+    )
+    elder_ticket_num: str = Field(
+        "0E", serialization_alias="ticketPanel:rows:3:ticketAmount"
+    )
+    college_ticket_num: str = Field(
+        "0P", serialization_alias="ticketPanel:rows:4:ticketAmount"
+    )
     seat_prefer: str = Field(..., serialization_alias="seatCon:seatRadioGroup")
     types_of_trip: int = Field(..., serialization_alias="tripCon:typesoftrip")
     search_by: str = Field(..., serialization_alias="bookingMethod")
     class_type: int = Field(0, serialization_alias="trainCon:trainRadioGroup")
+    train_requirement: int = Field(
+        0, serialization_alias="trainTypeContainer:typesoftrain"
+    )
     security_code: str = Field(..., serialization_alias="homeCaptcha:securityCode")
-
-    # TODO: Support other kind of ticket.
-    # child_ticket_num: str = Field("0H", serialization_alias="ticketPanel:rows:1:ticketAmount")
-    # disabled_ticket_num: str = Field("0W", serialization_alias="ticketPanel:rows:2:ticketAmount")
-    # elder_ticket_num: str = Field("0E", serialization_alias="ticketPanel:rows:3:ticketAmount")
-    # college_ticket_num: str = Field("0P", serialization_alias="ticketPanel:rows:4:ticketAmount")
 
     @validator("start_station", "dest_station")
     def check_station(cls, station):
