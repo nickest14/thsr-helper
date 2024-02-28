@@ -25,7 +25,7 @@ from .constants import (
     CHECK_ID_TYPE,
 )
 from thsr_helper.booking.requests import HTTPRequest
-
+from thsr_helper.config.settings import UserSettings, ConditionSettings
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ Error = namedtuple("Error", "msg")
 
 
 class BaseFlow:
-    def __init__(self, client: HTTPRequest, conditions: dict[str, any]) -> None:
+    def __init__(self, client: HTTPRequest, conditions: ConditionSettings) -> None:
         self.client = client
         self.conditions = conditions
         self.parser = None
@@ -42,21 +42,22 @@ class BaseFlow:
 class BookingFlow:
     def __init__(self, config: dict[str, any] = None) -> None:
         self.client = HTTPRequest()
-        self.config = config
+        self.user_settings = UserSettings(**config.get("user"))
+        self.condition_settings = ConditionSettings(**config.get("conditions"))
         self.parser = BookingFlowParser
         self.errors: list[Error] = []
 
     def run(self) -> None:
         # First page to get booking options.
         booking_response, passenger_info = InitPageFlow(
-            self.client, self.config.get("conditions")
+            self.client, self.condition_settings
         ).run()
         if self.check_error(booking_response):
             return
 
         # Second page. Train confirmation.
         train_response, selected_train = ConfirmTrainFlow(
-            self.client, self.config.get("conditions"), booking_response
+            self.client, self.condition_settings, booking_response
         ).run()
         if not selected_train or self.check_error(train_response):
             return
@@ -64,8 +65,8 @@ class BookingFlow:
         # Final page. Ticket confirmation.
         ticket_response, error = ConfirmTicketFlow(
             self.client,
-            self.config.get("conditions"),
-            self.config.get("user"),
+            self.condition_settings,
+            self.user_settings,
             train_response,
             passenger_info,
             selected_train,
@@ -77,7 +78,7 @@ class BookingFlow:
         self.show_ticket(ticket)
 
     def show_ticket(self, ticket: Ticket) -> None:
-        personal_id = self.config.get("user").get("personal_id")
+        personal_id = self.user_settings.personal_id
         console = Console()
         typer.secho(
             "-------------- 訂位結果 --------------", fg=typer.colors.BRIGHT_YELLOW
@@ -122,7 +123,7 @@ class BookingFlow:
 
 
 class InitPageFlow(BaseFlow):
-    def __init__(self, client: HTTPRequest, conditions: dict[str, any]) -> None:
+    def __init__(self, client: HTTPRequest, conditions: ConditionSettings) -> None:
         super().__init__(client, conditions)
         self.parser = InitPageParser
 
@@ -133,18 +134,18 @@ class InitPageFlow(BaseFlow):
         img: bytes = self.client.get_captcha_img(image_url).content
 
         passenger_info = {
-            PassengerType.ADULT: self.conditions.get("adult_ticket_num", 0),
-            PassengerType.CHILD: self.conditions.get("child_ticket_num", 0),
-            PassengerType.DISABLED: self.conditions.get("disabled_ticket_num", 0),
-            PassengerType.ELDER: self.conditions.get("elder_ticket_num", 0),
-            PassengerType.COLLEGE: self.conditions.get("college_ticket_num", 0),
+            PassengerType.ADULT: self.conditions.adult_ticket_num or 0,
+            PassengerType.CHILD: self.conditions.child_ticket_num or 0,
+            PassengerType.DISABLED: self.conditions.disabled_ticket_num or 0,
+            PassengerType.ELDER: self.conditions.elder_ticket_num or 0,
+            PassengerType.COLLEGE: self.conditions.college_ticket_num or 0,
         }
 
         booking_model = BookingModel(
-            start_station=STATION_MAP.get(self.conditions["start_station"]),
-            dest_station=STATION_MAP.get(self.conditions["dest_station"]),
-            outbound_time=self.conditions["thsr_time"],
-            outbound_date=self.conditions["date"],
+            start_station=STATION_MAP.get(self.conditions.start_station),
+            dest_station=STATION_MAP.get(self.conditions.dest_station),
+            outbound_time=self.conditions.thsr_time,
+            outbound_date=self.conditions.date,
             adult_ticket_num=self.convert_ticket_num(
                 passenger_info.get(PassengerType.ADULT), PassengerType.ADULT
             ),
@@ -163,7 +164,7 @@ class InitPageFlow(BaseFlow):
             seat_prefer=self.parser.parse_seat_prefer_value(page),
             types_of_trip=self.parser.parse_types_of_trip_value(page),
             search_by=self.parser.parse_search_by(page),
-            train_requirement=int(self.conditions.get("train_requirement", 0)),
+            train_requirement=int(self.conditions.train_requirement) or 0,
             security_code=fill_code(img, manual=True),
         )
         dict_params = json.loads(booking_model.json(by_alias=True))
@@ -176,7 +177,10 @@ class InitPageFlow(BaseFlow):
 
 class ConfirmTrainFlow(BaseFlow):
     def __init__(
-        self, client: HTTPRequest, conditions: dict[str, any], booking_response: bytes
+        self,
+        client: HTTPRequest,
+        conditions: ConditionSettings,
+        booking_response: bytes,
     ) -> None:
         super().__init__(client, conditions)
         self.booking_response = booking_response
@@ -199,7 +203,7 @@ class ConfirmTrainFlow(BaseFlow):
 
     def choose_train(self) -> Train:
         for train in self.trains:
-            start_hour, end_hour = self.conditions.get("time_range")
+            start_hour, end_hour = self.conditions.time_range
             hour = int(train.depart.split(":")[0])
             if start_hour <= hour <= end_hour:
                 return train
@@ -210,14 +214,14 @@ class ConfirmTicketFlow(BaseFlow):
     def __init__(
         self,
         client: HTTPRequest,
-        conditions: dict[str, any],
-        user_info: dict[str, any],
+        conditions: ConditionSettings,
+        user_settings: UserSettings,
         train_response: bytes,
         passenger_info: Dict[PassengerType, int],
         train: Train,
     ) -> None:
         super().__init__(client, conditions)
-        self.user_info = user_info
+        self.user_settings = user_settings
         self.train_response = train_response
         self.passenger_info = passenger_info
         self.train = train
@@ -226,11 +230,11 @@ class ConfirmTicketFlow(BaseFlow):
     def run(self) -> Tuple[bytes, Error | None]:
         page = self.parser.html_to_soup(self.train_response)
         ticket_model = ConfirmTicketModel(
-            personal_id=self.user_info.get("personal_id"),
-            phone_num=self.user_info.get("phone_number"),
+            personal_id=self.user_settings.personal_id,
+            phone_num=self.user_settings.phone_number,
             member_radio=self.parser.parse_member_radio(page),
         )
-        if email := self.user_info.get("email"):
+        if email := self.user_settings.email:
             ticket_model.email = email
 
         self.params = json.loads(ticket_model.json(by_alias=True))
@@ -253,8 +257,8 @@ class ConfirmTicketFlow(BaseFlow):
             for pass_type, passenger_count in self.passenger_info.items():
                 if passenger_count == 0:
                     continue
-                pass_ids: List = self.conditions.get(
-                    f"{pass_type.value}_ids", ""
+                pass_ids: List = getattr(
+                    self.conditions, f"{pass_type.value}_ids", ""
                 ).split(",")
                 use_pass_ids, error = self.validate_passenger_id(
                     early_bird, pass_ids, pass_type, passenger_count
