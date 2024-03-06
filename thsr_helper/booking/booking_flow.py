@@ -1,4 +1,3 @@
-from collections import namedtuple
 from typing import Tuple, Dict, List
 import json
 import logging
@@ -14,9 +13,16 @@ from .parser import (
     ConfirmTrainParser,
     InitPageParser,
     ConfirmTicketParser,
-    Ticket,
 )
-from .schema import BookingModel, ConfirmTrainModel, Train, ConfirmTicketModel
+from .schema import (
+    BookingModel,
+    ConfirmTrainModel,
+    Train,
+    ConfirmTicketModel,
+    Error,
+    Ticket,
+    Record,
+)
 from .constants import (
     STATION_MAP,
     PassengerType,
@@ -25,11 +31,10 @@ from .constants import (
     CHECK_ID_TYPE,
 )
 from thsr_helper.booking.requests import HTTPRequest
+from thsr_helper.booking.models import TinyDBManager
 from thsr_helper.config.settings import UserSettings, ConditionSettings
 
 logger = logging.getLogger(__name__)
-
-Error = namedtuple("Error", "msg")
 
 
 class BaseFlow:
@@ -45,6 +50,7 @@ class BookingFlow:
         self.user_settings = UserSettings(**config.get("user"))
         self.condition_settings = ConditionSettings(**config.get("conditions"))
         self.parser = BookingFlowParser
+        self.db = TinyDBManager()
         self.errors: list[Error] = []
 
     def run(self) -> None:
@@ -73,20 +79,22 @@ class BookingFlow:
         ).run()
         if error or self.check_error(ticket_response):
             return
-        page = self.parser.html_to_soup(ticket_response)
-        ticket = self.parser.parse_booking_result(page)
-        self.show_ticket(ticket)
 
-    def show_ticket(self, ticket: Ticket) -> None:
-        personal_id = self.user_settings.personal_id
+        page = self.parser.html_to_soup(ticket_response)
+        ticket: Ticket = self.parser.parse_booking_result(page)
+        record = Record(personal_id=self.user_settings.personal_id, **ticket._asdict())
+        self.db.save(record)
+        self.show_ticket(record)
+
+    def show_ticket(self, record: Record) -> None:
         console = Console()
         typer.secho(
             "-------------- 訂位結果 --------------", fg=typer.colors.BRIGHT_YELLOW
         )
-        typer.secho(f"繳費期限: {ticket.payment_deadline}", fg=typer.colors.BRIGHT_CYAN)
-        typer.secho(f"訂票身分證: {personal_id}", fg=typer.colors.BRIGHT_CYAN)
-        typer.secho(f"票數: {ticket.ticket_num_info}", fg=typer.colors.BRIGHT_CYAN)
-        typer.secho(f"總價: {ticket.price}", fg=typer.colors.BRIGHT_CYAN)
+        typer.secho(f"繳費期限: {record.payment_deadline}", fg=typer.colors.BRIGHT_CYAN)
+        typer.secho(f"訂票身分證: {record.personal_id}", fg=typer.colors.BRIGHT_CYAN)
+        typer.secho(f"票數: {record.ticket_num_info}", fg=typer.colors.BRIGHT_CYAN)
+        typer.secho(f"總價: {record.price}", fg=typer.colors.BRIGHT_CYAN)
         table = Table(show_header=True, header_style="bold dark_magenta")
         cols = [
             {"field": "日期", "style": "light_yellow3"},
@@ -100,13 +108,13 @@ class BookingFlow:
         for col in cols:
             table.add_column(col.get("field"), style=col.get("style"), justify="right")
         table.add_row(
-            ticket.date,
-            ticket.id,
-            ticket.start_station,
-            ticket.dest_station,
-            ticket.depart_time,
-            ticket.arrival_time,
-            ticket.train_id,
+            record.date,
+            record.id,
+            record.start_station,
+            record.dest_station,
+            record.depart_time,
+            record.arrival_time,
+            record.train_id,
         )
         console.print(table)
 

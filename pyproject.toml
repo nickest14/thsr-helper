@@ -17,6 +17,7 @@ requests = "^2.31.0"
 bs4 = "^0.0.2"
 pillow = "^10.2.0"
 pydantic = "^2.6.1"
+tinydb = "^4.8.0"
 
 [tool.poetry.scripts]
 thsr-helper = "thsr_helper.__main__:main"

@@ -1,4 +1,5 @@
 from enum import Enum, unique
+import os
 
 
 class HTTPConfig:
@@ -119,3 +120,6 @@ class TrainRequirement(str, Enum):
     ALL = "0"
     EARLY_BIRD = "1"
     NORMAL = "2"
+
+
+MODULE_DIR = os.path.dirname(os.path.abspath(__file__ + "/.."))

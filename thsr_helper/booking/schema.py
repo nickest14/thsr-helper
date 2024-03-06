@@ -1,9 +1,33 @@
 import re
+from collections import namedtuple
+
 from datetime import date, datetime
 from typer import BadParameter
 from pydantic import BaseModel, Field, validator
 
 from .constants import Stations, ThsrTime
+
+Error = namedtuple("Error", "msg")
+
+Ticket = namedtuple(
+    "Ticket",
+    [
+        "id",
+        "price",
+        "start_station",
+        "dest_station",
+        "train_id",
+        "depart_time",
+        "arrival_time",
+        "date",
+        "seat",
+        "seat_class",
+        "payment_deadline",
+        "ticket_num_info",
+    ],
+)
+
+Record = namedtuple("Record", Ticket._fields + ("personal_id",))
 
 
 class BookingModel(BaseModel):

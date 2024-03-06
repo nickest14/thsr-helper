@@ -7,6 +7,7 @@ import tomli
 from tomlkit import dump, dumps, table, document, comment
 
 from thsr_helper.settings import settings
+from thsr_helper.booking.constants import MODULE_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,7 @@ logger = logging.getLogger(__name__)
 class ConfigManager:
     @classmethod
     def _get_config_path(cls):
-        dir = os.path.dirname(os.path.abspath(__file__ + "/.."))
-        return os.path.join(dir, settings.config_file_path)
+        return os.path.join(MODULE_DIR, settings.config_file_path)
 
     @classmethod
     def _create_default_config(

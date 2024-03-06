@@ -1,31 +1,11 @@
 import abc
-from collections import namedtuple
 from typing import Mapping, Any, List
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
 from .constants import HTTPConfig
-from .schema import Train
-
-Error = namedtuple("Error", ["msg"])
-Ticket = namedtuple(
-    "Ticket",
-    [
-        "id",
-        "price",
-        "start_station",
-        "dest_station",
-        "train_id",
-        "depart_time",
-        "arrival_time",
-        "date",
-        "seat",
-        "seat_class",
-        "payment_deadline",
-        "ticket_num_info",
-    ],
-)
+from .schema import Train, Ticket, Error
 
 
 class BaseParser(metaclass=abc.ABCMeta):
@@ -61,7 +41,7 @@ class BookingFlowParser(BaseParser):
     }
 
     @classmethod
-    def parse_booking_result(cls, page: BeautifulSoup) -> None:
+    def parse_booking_result(cls, page: BeautifulSoup) -> Ticket:
         booking_id = page.find(**cls.booking_result["ticket_id"]).find("span").text
         deadline = (
             page.find(**cls.booking_result["payment_deadline"])
