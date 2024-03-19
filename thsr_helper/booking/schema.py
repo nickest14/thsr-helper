@@ -20,14 +20,12 @@ Ticket = namedtuple(
         "depart_time",
         "arrival_time",
         "date",
-        "seat",
-        "seat_class",
         "payment_deadline",
         "ticket_num_info",
     ],
 )
 
-Record = namedtuple("Record", Ticket._fields + ("personal_id",))
+Record = namedtuple("Record", Ticket._fields + ("personal_id", "date_ts"))
 
 
 class BookingModel(BaseModel):

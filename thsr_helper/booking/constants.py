@@ -1,5 +1,6 @@
 from enum import Enum, unique
 import os
+import pytz
 
 
 class HTTPConfig:
@@ -123,3 +124,4 @@ class TrainRequirement(str, Enum):
 
 
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__ + "/.."))
+TIMEZONE = pytz.timezone("Asia/Taipei")

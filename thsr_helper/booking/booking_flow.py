@@ -1,13 +1,13 @@
+from datetime import datetime
 from typing import Tuple, Dict, List
 import json
 import logging
 
+
 from requests.models import Response
-from rich.console import Console
-from rich.table import Table
 import typer
 
-from .utils import fill_code
+from .utils import fill_code, show_ticket
 from .parser import (
     BookingFlowParser,
     ConfirmTrainParser,
@@ -82,41 +82,20 @@ class BookingFlow:
 
         page = self.parser.html_to_soup(ticket_response)
         ticket: Ticket = self.parser.parse_booking_result(page)
-        record = Record(personal_id=self.user_settings.personal_id, **ticket._asdict())
-        self.db.save(record)
-        self.show_ticket(record)
 
-    def show_ticket(self, record: Record) -> None:
-        console = Console()
+        date_ts = datetime.strptime(
+            self.condition_settings.date, "%Y-%m-%d"
+        ).timestamp()
+        record = Record(
+            personal_id=self.user_settings.personal_id,
+            date_ts=date_ts,
+            **ticket._asdict(),
+        )
+        self.db.save(record)
         typer.secho(
             "-------------- 訂位結果 --------------", fg=typer.colors.BRIGHT_YELLOW
         )
-        typer.secho(f"繳費期限: {record.payment_deadline}", fg=typer.colors.BRIGHT_CYAN)
-        typer.secho(f"訂票身分證: {record.personal_id}", fg=typer.colors.BRIGHT_CYAN)
-        typer.secho(f"票數: {record.ticket_num_info}", fg=typer.colors.BRIGHT_CYAN)
-        typer.secho(f"總價: {record.price}", fg=typer.colors.BRIGHT_CYAN)
-        table = Table(show_header=True, header_style="bold dark_magenta")
-        cols = [
-            {"field": "日期", "style": "light_yellow3"},
-            {"field": "訂位代號", "style": "dark_red"},
-            {"field": "起程站", "style": ""},
-            {"field": "到達站", "style": ""},
-            {"field": "出發時間", "style": ""},
-            {"field": "到達時間", "style": ""},
-            {"field": "車次", "style": ""},
-        ]
-        for col in cols:
-            table.add_column(col.get("field"), style=col.get("style"), justify="right")
-        table.add_row(
-            record.date,
-            record.id,
-            record.start_station,
-            record.dest_station,
-            record.depart_time,
-            record.arrival_time,
-            record.train_id,
-        )
-        console.print(table)
+        show_ticket(record)
 
     def check_error(self, resp: Response) -> None:
         page = self.parser.html_to_soup(resp)

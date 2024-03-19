@@ -21,15 +21,11 @@ class BookingFlowParser(BaseParser):
         "phone": {"text": "行動電話"},
         "info": {"name": "table", "attrs": {"class": "table_simple"}},
         "outbound_info": {"text": "去程"},
-        "seat_class": {
-            "text": "車廂",
-        },
         "ticket_num": {"name": "p", "text": "票數"},
         "total_price": {"id": "setTrainTotalPriceValue"},
         "train_id": {"id": "setTrainCode0"},
         "depart_time": {"id": "setTrainDeparture0"},
         "arrival_time": {"id": "setTrainArrival0"},
-        "seat_num": {"name": "div", "attrs": {"class": "seat-label"}},
         "depart_station": {"name": "p", "attrs": {"class": "departure-stn"}},
         "arrival_station": {"name": "p", "attrs": {"class": "arrival-stn"}},
         "date": {"name": "span", "attrs": {"class": "date"}},
@@ -53,8 +49,6 @@ class BookingFlowParser(BaseParser):
         train_id = page.find(**cls.booking_result["train_id"]).text
         depart_time = page.find(**cls.booking_result["depart_time"]).text
         arrival_time = page.find(**cls.booking_result["arrival_time"]).text
-        seat_num = page.find(**cls.booking_result["seat_num"]).find_next().text
-        seat_class = page.find(**cls.booking_result["seat_class"]).find_next().text
         depart_station = (
             page.find(**cls.booking_result["depart_station"]).find_next().text
         )
@@ -68,13 +62,11 @@ class BookingFlowParser(BaseParser):
         ticket = Ticket(
             id=booking_id,
             payment_deadline=deadline,
-            seat_class=seat_class,
             ticket_num_info=ticket_num_info,
             price=total_price,
             train_id=train_id,
             depart_time=depart_time,
             arrival_time=arrival_time,
-            seat=seat_num,
             start_station=depart_station,
             dest_station=arrival_station,
             date=date,
