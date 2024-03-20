@@ -5,12 +5,12 @@ import typer
 from typing import Optional
 from thsr_helper import __app_name__, __version__
 
-app = typer.Typer()
+app = typer.Typer(help="A CLI for thsr-helper")
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"{__app_name__} v{__version__}")
+        typer.echo(f"{__app_name__} {__version__}")
         raise typer.Exit()
 
 
@@ -29,6 +29,9 @@ def handle_callback(
 
 
 def register_commands(app: typer.Typer):
+    """
+    GO
+    """
     modules: dict[str, str] = {
         "config": "Check or update config file",
         "booking": "Booking or check the ticket",

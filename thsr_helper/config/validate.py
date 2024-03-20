@@ -30,9 +30,10 @@ def validate_email(value: str):
 
 def validate_ids(value: str):
     pattern = r"^[A-Za-z]\d{9}$"
-    for id in value.split(","):
-        if not re.match(pattern, id):
-            raise BadParameter("Wrong id format.")
+    if value:
+        for id in value.split(","):
+            if not re.match(pattern, id):
+                raise BadParameter("Wrong id format.")
     return value
 
 
