@@ -79,7 +79,7 @@ class ConfigManager:
                 config = tomli.load(fp)
                 for section_name, section_data in options.items():
                     for key, value in section_data.items():
-                        if value:
+                        if value or isinstance(value, bool):
                             config[section_name][key] = value
 
                 fp.seek(0)

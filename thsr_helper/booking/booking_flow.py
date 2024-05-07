@@ -96,6 +96,7 @@ class BookingFlow:
             "-------------- 訂位結果 --------------", fg=typer.colors.BRIGHT_YELLOW
         )
         show_ticket(record)
+        return True
 
     def check_error(self, resp: Response) -> None:
         page = self.parser.html_to_soup(resp)
@@ -152,7 +153,7 @@ class InitPageFlow(BaseFlow):
             types_of_trip=self.parser.parse_types_of_trip_value(page),
             search_by=self.parser.parse_search_by(page),
             train_requirement=int(self.conditions.train_requirement) or 0,
-            security_code=fill_code(img, manual=True),
+            security_code=fill_code(img, manual=self.conditions.is_manual),
         )
         dict_params = json.loads(booking_model.json(by_alias=True))
         booking_response = self.client.submit_booking_form(dict_params).content

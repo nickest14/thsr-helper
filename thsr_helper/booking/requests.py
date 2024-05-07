@@ -16,7 +16,6 @@ class HTTPRequest:
             "User-Agent": HTTPConfig.HTTPHeader.USER_AGENT,
             "Accept": HTTPConfig.HTTPHeader.ACCEPT_HTML,
             "Accept-Language": HTTPConfig.HTTPHeader.ACCEPT_LANGUAGE,
-            "Accept-Encoding": HTTPConfig.HTTPHeader.ACCEPT_ENCODING,
         }
 
     def booking_page(self) -> Response:
@@ -24,15 +23,20 @@ class HTTPRequest:
             HTTPConfig.BOOKING_PAGE_URL,
             headers=self.common_header,
             allow_redirects=True,
+            timeout=2,
         )
 
     def get_captcha_img(self, img_url: str) -> Response:
-        return self.session.get(img_url, headers=self.common_header)
+        return self.session.get(img_url, headers=self.common_header, timeout=2)
 
     def submit_booking_form(self, params: Mapping[str, Any]) -> Response:
         url = HTTPConfig.SUBMIT_FORM_URL.format(self.session.cookies["JSESSIONID"])
         return self.session.post(
-            url, headers=self.common_header, params=params, allow_redirects=True
+            url,
+            headers=self.common_header,
+            params=params,
+            allow_redirects=True,
+            timeout=2,
         )
 
     def submit_train(self, params: Mapping[str, Any]) -> Response:
@@ -41,6 +45,7 @@ class HTTPRequest:
             headers=self.common_header,
             params=params,
             allow_redirects=True,
+            timeout=2,
         )
 
     def submit_ticket(self, params: Mapping[str, Any]) -> Response:
@@ -49,4 +54,5 @@ class HTTPRequest:
             headers=self.common_header,
             params=params,
             allow_redirects=True,
+            timeout=2,
         )

@@ -24,3 +24,4 @@ class ConditionSettings(BaseModel):
     time_range: List[int] = [0, 24]
     start_station: str = ""
     dest_station: str = ""
+    is_manual: bool = True

@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta
 import logging
 
@@ -39,13 +40,26 @@ def ls(
 
 
 @app.command(name="order")
-def order():
+def order(
+    execution_times: int = typer.Option(
+        1, help="How many times to execute ordering ticket."
+    ),
+):
     """
     Booking the ticket
     """
     if config := ConfigManager().get_config():
-        flow = BookingFlow(config)
-        flow.run()
+        for _ in range(execution_times):
+            try:
+                flow = BookingFlow(config)
+                get_ticket: bool = flow.run()
+                if get_ticket:
+                    logger.info("Get ticket!")
+                    break
+            except Exception as e:
+                logger.warning(e)
+            finally:
+                time.sleep(1)
     else:
         logger.warning(
             "[red] Failed to get the config file. Creating the default one. "

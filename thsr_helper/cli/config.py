@@ -81,6 +81,7 @@ def update(
         case_sensitive=False,
         help="Train requirement, 0: all, 1: early bird, 2: normal",
     ),
+    is_manual: bool = typer.Option(False, help="Manually enter the verification code"),
 ):
     """
     Update the config file
@@ -107,12 +108,17 @@ def update(
             "date": date,
             "time_range": time_range,
             "thsr_time": thsr_time,
+            "is_manual": is_manual,
         },
     }
 
     for table_name, table_attributes in attributes.items():
         for attr_name, attr_val in table_attributes.items():
-            if isinstance(attr_val, (int, str)) and attr_val:
+            if (
+                isinstance(attr_val, (int, str))
+                and attr_val
+                or isinstance(attr_val, bool)
+            ):
                 options[table_name][attr_name] = attr_val
             elif isinstance(attr_val, tuple) and all(attr_val):
                 options[table_name][attr_name] = attr_val
