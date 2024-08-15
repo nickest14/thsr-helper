@@ -12,10 +12,17 @@ class HTTPRequest:
         self.session = Session()
         self.session.mount("https://", HTTPAdapter(max_retries=max_retries))
         self.common_header: dict = {
-            "Host": HTTPConfig.HTTPHeader.BOOKING_PAGE_HOST,
             "User-Agent": HTTPConfig.HTTPHeader.USER_AGENT,
             "Accept": HTTPConfig.HTTPHeader.ACCEPT_HTML,
             "Accept-Language": HTTPConfig.HTTPHeader.ACCEPT_LANGUAGE,
+            "Referer": HTTPConfig.HTTPHeader.REFERER,
+            "Cache-Control": "max-age=0",
+            "Connection": "keep-alive",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-site",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1",
         }
 
     def booking_page(self) -> Response:
