@@ -193,7 +193,10 @@ class ConfirmTrainFlow(BaseFlow):
         for train in self.trains:
             start_hour, end_hour = self.conditions.time_range
             hour = int(train.depart.split(":")[0])
+            # minute = int(train.depart.split(":")[1])
             if start_hour <= hour <= end_hour:
+                # print(f'... hour: {hour} minute: {minute}')
+                # if start_hour <= hour <= end_hour and minute > 20:
                 return train
         return None
 

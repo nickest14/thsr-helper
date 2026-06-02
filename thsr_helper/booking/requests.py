@@ -24,6 +24,9 @@ class HTTPRequest:
             "Sec-Fetch-Site": "same-site",
             "Sec-Fetch-User": "?1",
             "Upgrade-Insecure-Requests": "1",
+            "sec-ch-ua": HTTPConfig.HTTPHeader.SEC_CH_UA,
+            "sec-ch-ua-mobile": HTTPConfig.HTTPHeader.SEC_CH_UA_MOBILE,
+            "sec-ch-ua-platform": HTTPConfig.HTTPHeader.SEC_CH_UA_PLATFORM,
         }
         self.timeout: int = 5
 
@@ -36,31 +39,71 @@ class HTTPRequest:
         )
 
     def get_captcha_img(self, img_url: str) -> Response:
-        return self.session.get(img_url, headers=self.common_header, timeout=self.timeout)
+        # 圖片請求使用不同的 headers
+        img_headers = self.common_header.copy()
+        img_headers.update(
+            {
+                "Accept": HTTPConfig.HTTPHeader.ACCEPT_IMG,
+                "Sec-Fetch-Dest": "image",
+                "Sec-Fetch-Mode": "no-cors",
+                "Sec-Fetch-Site": "same-origin",
+            }
+        )
+        # 更新 Referer 為當前頁面
+        img_headers["Referer"] = HTTPConfig.BOOKING_PAGE_URL
+        return self.session.get(img_url, headers=img_headers, timeout=self.timeout)
 
     def submit_booking_form(self, params: Mapping[str, Any]) -> Response:
         url = HTTPConfig.SUBMIT_FORM_URL.format(self.session.cookies["JSESSIONID"])
+        # POST 請求使用不同的 headers
+        post_headers = self.common_header.copy()
+        post_headers.update(
+            {
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-origin",
+                "Referer": HTTPConfig.BOOKING_PAGE_URL,
+            }
+        )
         return self.session.post(
             url,
-            headers=self.common_header,
+            headers=post_headers,
             params=params,
             allow_redirects=True,
             timeout=self.timeout,
         )
 
     def submit_train(self, params: Mapping[str, Any]) -> Response:
+        post_headers = self.common_header.copy()
+        post_headers.update(
+            {
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-origin",
+                "Referer": HTTPConfig.BOOKING_PAGE_URL,
+            }
+        )
         return self.session.post(
             HTTPConfig.CONFIRM_TRAIN_URL,
-            headers=self.common_header,
+            headers=post_headers,
             params=params,
             allow_redirects=True,
             timeout=self.timeout,
         )
 
     def submit_ticket(self, params: Mapping[str, Any]) -> Response:
+        post_headers = self.common_header.copy()
+        post_headers.update(
+            {
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-origin",
+                "Referer": HTTPConfig.BOOKING_PAGE_URL,
+            }
+        )
         return self.session.post(
             HTTPConfig.CONFIRM_TICKET_URL,
-            headers=self.common_header,
+            headers=post_headers,
             params=params,
             allow_redirects=True,
             timeout=self.timeout,
